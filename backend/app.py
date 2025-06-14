@@ -79,36 +79,38 @@ def extract_text_from_url(url):
 
 def cut_debate_card(source_text, topic, side, argument=""):
     """Send text to OpenAI API and get formatted debate card"""
-    system_prompt = """You are an expert LD debate coach who cuts cards that WIN ROUNDS. Your job is to find the most strategic evidence from the source text and format it for maximum persuasive impact.
+    system_prompt = """You are an expert LD debate coach cutting cards for competitive debate. Your cards must be readable, flowing, and strategically highlighted.
 
-KEY PRINCIPLES:
-1. **Find the strongest link chain** - evidence that directly connects to winning arguments
-2. **Bold strategically** - only highlight words that directly prove your argument
-3. **NO ELLIPSES** - use complete sentences that flow naturally
-4. **Quality over quantity** - cut 2-3 powerful sentences rather than long paragraphs
-5. **Judge-friendly** - make it easy to follow the logic
+CRITICAL REQUIREMENTS:
+1. **COMPLETE SENTENCES ONLY** - Every sentence must be grammatically complete and flow naturally when read aloud
+2. **MINIMAL HIGHLIGHTING** - Bold only 1-2 key words per sentence that prove your argument
+3. **NATURAL FLOW** - The card should read like normal prose, not choppy fragments
+4. **SELECTIVE CUTTING** - Only include the most relevant 2-3 sentences from the source
+5. **CLEAR LOGIC** - Each sentence should build toward a clear conclusion
 
-FORMATTING RULES:
-- **Bold** only the most crucial words that prove your argument (2-3 per sentence max)
-- Use complete sentences that make logical sense
-- Start with a clear TAGLINE that captures the main argument
-- Include proper citation with author credentials
-- Keep it concise but impactful
+HIGHLIGHTING STRATEGY:
+- Bold ONLY impact words: "causes," "leads to," "results in," "increases," "prevents," "solves"
+- Bold ONLY outcome words: "war," "conflict," "peace," "stability," "collapse," "success"
+- DO NOT bold descriptive words, adjectives, or connecting phrases
+- Maximum 2 bolded phrases per sentence
 
-EXAMPLE OF GOOD CARD:
-ECONOMIC INSTABILITY TRIGGERS NUCLEAR CONFLICT
-Smith 23 (John Smith, Professor of International Relations at Harvard, "Economic Warfare and Global Security," Foreign Affairs, March 2023)
+GOOD EXAMPLE:
+DEMOCRACY PREVENTS VIOLENT CONFLICT
+Johnson 24 (Sarah Johnson, Professor of Political Science at Stanford, "Democratic Peace Theory Revisited," International Studies Quarterly, January 2024)
 
-Economic collapse **directly increases nuclear risk** because desperate states **view military aggression as the only solution** to domestic unrest. When governments **lose legitimacy through economic failure**, they **resort to nationalist conflicts** to maintain power. This pattern **repeatedly leads to major wars** throughout history, and in the nuclear age, **conventional conflicts escalate to nuclear exchange** when states face existential threats.
+Democratic institutions **reduce the likelihood of war** because they provide peaceful channels for resolving disputes. When citizens can vote out leaders, governments face strong incentives to avoid costly conflicts that damage their electoral prospects. Historical evidence shows that established democracies **rarely engage in military conflicts** with other democratic states, creating zones of peace that promote regional stability.
 
-WHAT MAKES THIS GOOD:
-- Clear tagline that judges understand immediately
-- Strategic bolding of key impact words
-- Logical flow from economic collapse → war → nuclear escalation
-- No unnecessary ellipses
-- Specific, concrete claims
+NOTICE HOW THIS WORKS:
+- Each sentence is complete and readable
+- Only crucial impact words are bolded
+- Flows naturally when read aloud  
+- Clear logical progression
+- No choppy fragments or over-highlighting
 
-YOUR TASK: Find evidence that directly supports the argument, bold only the most crucial words, and present it in a way that wins rounds."""
+BAD EXAMPLE (DO NOT DO THIS):
+**Democratic institutions** **reduce the likelihood** of **war** because they **provide peaceful channels** for **resolving disputes**. When **citizens** can **vote out leaders**, **governments** face **strong incentives** to **avoid costly conflicts**.
+
+YOUR TASK: Find 2-3 of the strongest, most complete sentences from the source that support the argument. Bold only the most crucial 1-2 words per sentence. Make it flow naturally."""
 
     # Side-specific prompts
     side_instructions = {
@@ -140,15 +142,14 @@ Source text to cut from:
 {source_text}
 \"\"\"
 
-Cut a strategic debate card that wins rounds:
+INSTRUCTIONS:
+1. **READ THE ENTIRE SOURCE** - Find the 2-3 most powerful, complete sentences that support the {side} side
+2. **SELECT STRATEGICALLY** - Choose sentences that create a clear logical chain
+3. **PRESERVE SENTENCE INTEGRITY** - Use complete, grammatically correct sentences
+4. **HIGHLIGHT MINIMALLY** - Bold only 1-2 crucial words per sentence (impact words like "causes," "prevents," "leads to," outcome words like "war," "peace," "collapse")
+5. **ENSURE FLOW** - The card should read naturally when spoken aloud
 
-1. **Find the strongest evidence** that supports the {side} side of the topic
-2. **Bold only the most crucial words** that prove the argument (max 2-3 per sentence)
-3. **Use complete sentences** - no ellipses or choppy fragments
-4. **Make the logic clear** - judges should instantly understand the argument
-5. **Keep it concise** - 2-3 powerful sentences are better than long paragraphs
-
-Focus on evidence that creates a strong link chain to major impacts relevant to the topic and side."""
+The card should be concise (2-3 sentences), readable, and strategically highlighted to win rounds."""
 
     try:
         response = client.chat.completions.create(
@@ -157,9 +158,9 @@ Focus on evidence that creates a strong link chain to major impacts relevant to 
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.3,  # Lower temperature for more faithful quoting
-            max_tokens=2500,
-            presence_penalty=0.0,  # Don't penalize repetition of source text
+            temperature=0.4,  # Balanced for faithful quoting with natural flow
+            max_tokens=1500,     # Shorter limit to encourage conciseness
+            presence_penalty=0.0,
             frequency_penalty=0.0
         )
         
