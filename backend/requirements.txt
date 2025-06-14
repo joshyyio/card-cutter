@@ -1,0 +1,7 @@
+flask==3.0.0
+flask-cors==4.0.0
+newspaper3k==0.2.8
+openai==1.6.1
+python-dotenv==1.0.0
+gunicorn==21.2.0
+requests==2.31.0 
