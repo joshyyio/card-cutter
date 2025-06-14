@@ -77,43 +77,78 @@ def extract_text_from_url(url):
     except Exception as e:
         raise Exception(f"Error extracting article from URL: {str(e)}")
 
-def cut_debate_card(source_text, topic, side):
+def cut_debate_card(source_text, topic, side, argument=""):
     """Send text to OpenAI API and get formatted debate card"""
-    system_prompt = """You are an expert debate coach cutting Lincoln-Douglas (LD) cards. 
+    system_prompt = """You are an expert LD debate coach who cuts cards that WIN ROUNDS. Your job is to find the most strategic evidence from the source text and format it for maximum persuasive impact.
 
-CRITICAL FORMAT REQUIREMENTS:
-1. TAGLINE: Start with a short, punchy tagline that summarizes the argument (5-10 words max)
-2. CITATION: Author Last Name 'Year (Author full name, credentials if available, "Article Title", Publication, Date, URL if available)
-3. CARD TEXT: The actual evidence formatted as follows:
-   - - ***triple asterisks*** for the MOST critical phrases
-   - **double asterisks** for important phrases
-   - _single underscores_ for emphasis/terms to stress when reading
-   - **[HIGHLIGHT]** around key impactful sections
-   - *italics* for technical terms and key concepts
-   - Use __double underscores__ for secondary important phrases
-   - Keep full sentences and paragraphs for context
-   - The card should flow naturally when read aloud
+KEY PRINCIPLES:
+1. **Find the strongest link chain** - evidence that directly connects to winning arguments
+2. **Bold strategically** - only highlight words that directly prove your argument
+3. **NO ELLIPSES** - use complete sentences that flow naturally
+4. **Quality over quantity** - cut 2-3 powerful sentences rather than long paragraphs
+5. **Judge-friendly** - make it easy to follow the logic
 
-EXAMPLE FORMAT:
-ECONOMIC COLLAPSE CAUSES NUCLEAR WAR
-Smith '23 (John Smith, Professor of Economics at Harvard, "Global Economic Risks", Foreign Affairs, March 15, 2023)
-Economic instability **directly increases the risk of nuclear conflict** between major powers. When nations face __severe economic pressure__, they become more likely to **pursue aggressive foreign policies** as a distraction from domestic troubles. History shows that __the Great Depression__ contributed to the rise of fascism and **ultimately led to World War II**.
+FORMATTING RULES:
+- **Bold** only the most crucial words that prove your argument (2-3 per sentence max)
+- Use complete sentences that make logical sense
+- Start with a clear TAGLINE that captures the main argument
+- Include proper citation with author credentials
+- Keep it concise but impactful
 
-IMPORTANT:
-- Make cards punchy and impactful
-- Prioritize evidence that directly links to the topic and side
-- Cut for persuasion and clarity
-- Keep the most impactful evidence"""
+EXAMPLE OF GOOD CARD:
+ECONOMIC INSTABILITY TRIGGERS NUCLEAR CONFLICT
+Smith 23 (John Smith, Professor of International Relations at Harvard, "Economic Warfare and Global Security," Foreign Affairs, March 2023)
 
-    user_prompt = f"""The LD topic is: "{topic}".
-I am debating on the {side} side.
+Economic collapse **directly increases nuclear risk** because desperate states **view military aggression as the only solution** to domestic unrest. When governments **lose legitimacy through economic failure**, they **resort to nationalist conflicts** to maintain power. This pattern **repeatedly leads to major wars** throughout history, and in the nuclear age, **conventional conflicts escalate to nuclear exchange** when states face existential threats.
 
-Here is the source text:
+WHAT MAKES THIS GOOD:
+- Clear tagline that judges understand immediately
+- Strategic bolding of key impact words
+- Logical flow from economic collapse â†’ war â†’ nuclear escalation
+- No unnecessary ellipses
+- Specific, concrete claims
+
+YOUR TASK: Find evidence that directly supports the argument, bold only the most crucial words, and present it in a way that wins rounds."""
+
+    # Side-specific prompts
+    side_instructions = {
+        "affirmative": """
+Focus on:
+- Moral imperatives and obligations
+- Solving harms/preventing catastrophe
+- Benefits of affirming the resolution
+- Positive impacts of action""",
+        "negative": """
+Focus on:
+- Disadvantages and risks
+- Unintended consequences
+- Problems with the affirmative worldview
+- Impacts of affirming/acting"""
+    }
+
+    # Build the user prompt with argument integration
+    argument_instruction = ""
+    if argument:
+        argument_instruction = f"\nSPECIFIC ARGUMENT TO SUPPORT: {argument}\nFind evidence that directly proves this argument is true."
+    
+    user_prompt = f"""Topic: "{topic}"
+Side: {side}
+{side_instructions.get(side.lower(), "")}{argument_instruction}
+
+Source text to cut from:
 \"\"\"
 {source_text}
 \"\"\"
 
-Please cut a card based on the arguments relevant to my side. Do NOT summarizeâ€”use real sentences and phrases from the article. Cut for maximum clarity and persuasiveness."""
+Cut a strategic debate card that wins rounds:
+
+1. **Find the strongest evidence** that supports the {side} side of the topic
+2. **Bold only the most crucial words** that prove the argument (max 2-3 per sentence)
+3. **Use complete sentences** - no ellipses or choppy fragments
+4. **Make the logic clear** - judges should instantly understand the argument
+5. **Keep it concise** - 2-3 powerful sentences are better than long paragraphs
+
+Focus on evidence that creates a strong link chain to major impacts relevant to the topic and side."""
 
     try:
         response = client.chat.completions.create(
@@ -122,8 +157,10 @@ Please cut a card based on the arguments relevant to my side. Do NOT summarizeâ€
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.7,
-            max_tokens=2000
+            temperature=0.3,  # Lower temperature for more faithful quoting
+            max_tokens=2500,
+            presence_penalty=0.0,  # Don't penalize repetition of source text
+            frequency_penalty=0.0
         )
         
         return response.choices[0].message.content
@@ -133,21 +170,67 @@ Please cut a card based on the arguments relevant to my side. Do NOT summarizeâ€
 
 def format_card_html(card_text):
     """Convert the card text to HTML with proper formatting"""
-    # Replace **text** with <strong>text</strong>
-    html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', card_text)
+    # First, handle triple asterisks (most important)
+    html = re.sub(r'\*\*\*(.*?)\*\*\*', r'<span class="triple-emphasis">\1</span>', card_text)
     
-    # Replace _text_ with <u>text</u>
-    html = re.sub(r'_(.*?)_', r'<u>\1</u>', html)
+    # Then handle double asterisks
+    html = re.sub(r'\*\*(.*?)\*\*', r'<strong class="key-impact">\1</strong>', html)
     
-    # Replace [HIGHLIGHT]text[/HIGHLIGHT] or ALL CAPS with highlighted span
+    # Handle double underscores
+    html = re.sub(r'__(.*?)__', r'<span class="important">\1</span>', html)
+    
+    # Handle single underscores (but not in URLs)
+    # First, temporarily replace URLs to protect them
+    url_pattern = r'https?://[^\s<>"\']+_[^\s<>"\']*'
+    urls = re.findall(url_pattern, html)
+    url_placeholders = {}
+    for i, url in enumerate(urls):
+        placeholder = f'__URL_PLACEHOLDER_{i}__'
+        url_placeholders[placeholder] = url
+        html = html.replace(url, placeholder)
+    
+    # Now safely apply underscore formatting
+    html = re.sub(r'_([^_]+)_', r'<u>\1</u>', html)
+    
+    # Restore URLs
+    for placeholder, url in url_placeholders.items():
+        html = html.replace(placeholder, url)
+    
+    # Handle [HIGHLIGHT] tags
     html = re.sub(r'\[HIGHLIGHT\](.*?)\[/HIGHLIGHT\]', r'<span class="highlight">\1</span>', html)
     
-    # Convert line breaks to <br>
-    html = html.replace('\n', '<br>\n')
+    # Handle [...] for omitted text (discouraged but handle if present)
+    html = re.sub(r'\[\.\.\.+\]', r'<span class="omitted">[...]</span>', html)
     
-    # Wrap in paragraphs
-    paragraphs = html.split('<br>\n<br>\n')
-    html = '\n'.join([f'<p>{p}</p>' for p in paragraphs if p.strip()])
+    # Handle [sic]
+    html = re.sub(r'\[sic\]', r'<span class="sic">[sic]</span>', html)
+    
+    # Convert line breaks to <br> but preserve paragraph structure
+    lines = html.split('\n')
+    formatted_html = []
+    
+    for i, line in enumerate(lines):
+        if line.strip():
+            # Check if this is the tagline (first non-empty line, usually short)
+            if i == 0 or (i == 1 and not lines[0].strip()):
+                formatted_html.append(f'<h3 class="tagline">{line}</h3>')
+            # Check if this is the citation (contains year pattern and parentheses)
+            elif re.search(r"'\d{2}", line) and '(' in line and ')' in line:
+                formatted_html.append(f'<p class="citation">{line}</p>')
+            # Otherwise it's card text
+            else:
+                # Don't add extra line breaks within paragraphs
+                if formatted_html and formatted_html[-1].startswith('<p class="card-text">'):
+                    formatted_html[-1] = formatted_html[-1][:-4] + '<br>' + line + '</p>'
+                else:
+                    formatted_html.append(f'<p class="card-text">{line}</p>')
+        elif formatted_html:  # Empty line creates paragraph break
+            continue
+    
+    html = '\n'.join(formatted_html)
+    
+    # Wrap in container
+    html = f'<div class="debate-card">\n{html}\n</div>'
     
     return html
 
@@ -167,6 +250,7 @@ def cut_card():
         # Get form data
         topic = request.form.get('topic')
         side = request.form.get('side')
+        argument = request.form.get('argument', '')
         url = request.form.get('url')
         
         # Validate inputs
@@ -185,7 +269,7 @@ def cut_card():
             return jsonify({'error': 'Either PDF or URL must be provided'}), 400
         
         # Cut the debate card
-        card_text = cut_debate_card(source_text, topic, side)
+        card_text = cut_debate_card(source_text, topic, side, argument)
         
         # Format as HTML
         card_html = format_card_html(card_text)
